@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DocMind — AI PDF Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===== THEME VARIABLES ===== */
+:root[data-theme="dark"] {
+  --bg: #0a0a0f;
+  --bg2: #111118;
+  --card: #16161f;
+  --card2: #1c1c28;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --text: #f0f0f5;
+  --text2: #a0a0b5;
+  --muted: #5a5a70;
+  --accent: #7c6aff;
+  --accent2: #ff6a9e;
+  --accent3: #6affcb;
+  --chat-user: rgba(124,106,255,0.15);
+  --chat-ai: #1c1c28;
+  --shadow: rgba(0,0,0,0.4);
+  --blob-op: 0.15;
+}
+:root[data-theme="light"] {
+  --bg: #f4f2ff;
+  --bg2: #ede9ff;
+  --card: #ffffff;
+  --card2: #f8f6ff;
+  --border: rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.14);
+  --text: #14102e;
+  --text2: #4a4468;
+  --muted: #9590b0;
+  --accent: #6355e8;
+  --accent2: #e8407a;
+  --accent3: #00b882;
+  --chat-user: rgba(99,85,232,0.1);
+  --chat-ai: #f0eeff;
+  --shadow: rgba(99,85,232,0.1);
+  --blob-op: 0.08;
+}
+
+/* ===== RESET ===== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background 0.3s,color 0.3s;overflow-x:hidden;}
+
+/* ===== BLOBS ===== */
+.blob{position:fixed;border-radius:50%;filter:blur(90px);pointer-events:none;z-index:0;opacity:var(--blob-op);transition:opacity 0.4s;}
+.b1{width:500px;height:500px;background:var(--accent);top:-150px;right:-100px;animation:drift 9s ease-in-out infinite alternate;}
+.b2{width:350px;height:350px;background:var(--accent2);bottom:0;left:-80px;animation:drift 11s ease-in-out infinite alternate-reverse;}
+.b3{width:250px;height:250px;background:var(--accent3);top:45%;right:5%;animation:drift 13s ease-in-out infinite alternate;}
+@keyframes drift{from{transform:translate(0,0) scale(1);}to{transform:translate(35px,25px) scale(1.1);}}
+
+/* ===== LAYOUT ===== */
+.app{position:relative;z-index:1;display:grid;grid-template-columns:1fr 380px;grid-template-rows:auto 1fr;min-height:100vh;max-width:1280px;margin:0 auto;padding:0 24px 40px;}
+
+/* ===== NAVBAR ===== */
+nav{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:20px 0 24px;}
+.logo{font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;letter-spacing:-0.5px;}
+.logo span{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.nav-right{display:flex;align-items:center;gap:12px;}
+.theme-btn{width:40px;height:40px;border-radius:10px;border:1px solid var(--border2);background:var(--card);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.1rem;transition:all 0.2s;color:var(--text);}
+.theme-btn:hover{border-color:var(--accent);transform:scale(1.05);}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(124,106,255,0.12);border:1px solid rgba(124,106,255,0.25);font-size:0.7rem;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--accent3);animation:pulse 1.5s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+
+/* ===== LEFT PANEL ===== */
+.left{padding-right:28px;}
+.hero{margin-bottom:28px;}
+h1{font-family:'Syne',sans-serif;font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:800;line-height:1.08;letter-spacing:-1px;margin-bottom:10px;}
+.grad{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.sub{color:var(--text2);font-size:0.88rem;font-weight:300;line-height:1.65;}
+
+/* ===== UPLOAD ===== */
+.drop-area{border:1.5px dashed var(--border2);border-radius:18px;padding:32px 20px;text-align:center;background:var(--card);transition:all 0.3s;cursor:pointer;margin-bottom:16px;user-select:none;position:relative;}
+.drop-area:hover,.drop-area.over{border-color:var(--accent);background:var(--card2);}
+.drop-area.over{transform:scale(1.01);}
+.drop-area.ok{border-color:var(--accent3);border-style:solid;}
+.dicon{width:52px;height:52px;background:linear-gradient(135deg,rgba(124,106,255,0.18),rgba(255,106,158,0.1));border-radius:14px;border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin:0 auto 12px;transition:transform 0.3s;}
+.drop-area.over .dicon{transform:scale(1.15) rotate(-6deg);}
+.dtitle{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;margin-bottom:5px;}
+.dsub{font-size:0.77rem;color:var(--muted);}
+.dsub b{color:var(--accent);font-weight:500;}
+#filePick{display:none;}
+
+/* File chip */
+.chip{display:none;align-items:center;gap:10px;padding:10px 14px;background:rgba(106,255,203,0.06);border:1px solid rgba(106,255,203,0.2);border-radius:10px;margin-bottom:18px;}
+.chip.on{display:flex;}
+.cname{font-size:0.82rem;font-weight:500;color:var(--accent3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.csize{font-size:0.72rem;color:var(--muted);white-space:nowrap;}
+.cdot{width:8px;height:8px;border-radius:50%;background:var(--accent3);flex-shrink:0;animation:pulse 1.5s ease-in-out infinite;}
+
+/* Tabs */
+.tabs{display:flex;gap:5px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:5px;margin-bottom:16px;}
+.tab{flex:1;padding:9px 6px;border-radius:10px;border:none;background:transparent;color:var(--muted);font-family:'Inter',sans-serif;font-size:0.74rem;font-weight:500;cursor:pointer;transition:all 0.2s;display:flex;flex-direction:column;align-items:center;gap:3px;}
+.tab .ti{font-size:1rem;}
+.tab:hover:not(:disabled){color:var(--text);background:var(--border);}
+.tab.on{background:linear-gradient(135deg,rgba(124,106,255,0.22),rgba(255,106,158,0.1));color:var(--text);border:1px solid rgba(124,106,255,0.3);}
+.tab:disabled{opacity:0.3;cursor:not-allowed;}
+
+/* Run btn */
+.runbtn{width:100%;padding:14px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;font-family:'Syne',sans-serif;font-size:0.95rem;font-weight:700;cursor:pointer;transition:all 0.25s;margin-bottom:24px;letter-spacing:0.02em;}
+.runbtn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 28px rgba(124,106,255,0.4);}
+.runbtn:disabled{opacity:0.35;cursor:not-allowed;transform:none;}
+
+/* Results */
+.rlabel{font-family:'Syne',sans-serif;font-size:0.67rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.rlabel::after{content:'';flex:1;height:1px;background:var(--border);}
+.rcard{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:14px;animation:up 0.35s cubic-bezier(0.16,1,0.3,1);transition:border-color 0.2s;}
+.rcard:hover{border-color:var(--border2);}
+@keyframes up{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+.rhead{padding:12px 16px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.rico{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:0.95rem;flex-shrink:0;}
+.is{background:rgba(124,106,255,0.15);}
+.ik{background:rgba(106,255,203,0.12);}
+.it{background:rgba(255,106,158,0.12);}
+.rtitle{font-family:'Syne',sans-serif;font-size:0.87rem;font-weight:700;flex:1;}
+.rtag{font-size:0.62rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;padding:3px 8px;border-radius:20px;}
+.tgs{background:rgba(124,106,255,0.15);color:var(--accent);}
+.tgk{background:rgba(106,255,203,0.12);color:var(--accent3);}
+.tgt{background:rgba(255,106,158,0.12);color:var(--accent2);}
+.copy-btn{width:28px;height:28px;border-radius:7px;border:1px solid var(--border2);background:var(--card2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.8rem;color:var(--muted);transition:all 0.2s;flex-shrink:0;}
+.copy-btn:hover{border-color:var(--accent);color:var(--accent);}
+.copy-btn.copied{border-color:var(--accent3);color:var(--accent3);}
+.rbody{padding:16px;font-size:0.845rem;line-height:1.8;color:var(--text2);white-space:pre-wrap;}
+.rbody.loading{display:flex;align-items:center;gap:12px;color:var(--muted);}
+.dots{display:flex;gap:5px;align-items:center;}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:bop 1.2s ease-in-out infinite;}
+.dot:nth-child(2){animation-delay:.2s;background:var(--accent2);}
+.dot:nth-child(3){animation-delay:.4s;background:var(--accent3);}
+@keyframes bop{0%,80%,100%{transform:translateY(0);}40%{transform:translateY(-9px);}}
+
+/* ===== RIGHT PANEL — AI CHAT ===== */
+.right{border-left:1px solid var(--border);padding-left:28px;display:flex;flex-direction:column;height:calc(100vh - 100px);position:sticky;top:20px;}
+.chat-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-shrink:0;}
+.chat-title{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;}
+.chat-sub{font-size:0.72rem;color:var(--muted);margin-top:1px;}
+.chat-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;}
+.chat-context{font-size:0.72rem;padding:6px 12px;background:rgba(106,255,203,0.07);border:1px solid rgba(106,255,203,0.2);border-radius:8px;color:var(--accent3);margin-bottom:12px;display:none;flex-shrink:0;}
+.chat-context.on{display:block;}
+
+/* Messages area */
+.messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding-right:4px;margin-bottom:14px;}
+.messages::-webkit-scrollbar{width:4px;}
+.messages::-webkit-scrollbar-track{background:transparent;}
+.messages::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+.msg{padding:12px 14px;border-radius:14px;font-size:0.835rem;line-height:1.7;animation:up 0.25s ease;max-width:90%;}
+.msg.user{background:var(--chat-user);border:1px solid rgba(124,106,255,0.2);color:var(--text);align-self:flex-end;border-bottom-right-radius:4px;}
+.msg.ai{background:var(--chat-ai);border:1px solid var(--border);color:var(--text2);align-self:flex-start;border-bottom-left-radius:4px;position:relative;}
+.msg.ai .msg-copy{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:5px;border:1px solid var(--border2);background:var(--card);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.65rem;color:var(--muted);opacity:0;transition:all 0.2s;}
+.msg.ai:hover .msg-copy{opacity:1;}
+.msg.ai .msg-copy:hover{color:var(--accent);border-color:var(--accent);}
+.msg.ai .msg-copy.copied{color:var(--accent3);border-color:var(--accent3);opacity:1;}
+.msg.typing{color:var(--muted);}
+.welcome{text-align:center;padding:30px 16px;color:var(--muted);font-size:0.82rem;line-height:1.7;}
+.welcome .wi{font-size:2rem;margin-bottom:10px;display:block;}
+.welcome b{color:var(--text2);font-weight:500;}
+
+/* Suggestions */
+.suggestions{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;flex-shrink:0;}
+.sug{padding:5px 10px;border-radius:20px;border:1px solid var(--border2);background:var(--card);font-size:0.72rem;color:var(--text2);cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+.sug:hover{border-color:var(--accent);color:var(--accent);background:rgba(124,106,255,0.08);}
+
+/* Chat input */
+.chat-input-wrap{display:flex;gap:8px;align-items:flex-end;flex-shrink:0;}
+.chat-textarea{flex:1;padding:12px 14px;background:var(--card);border:1px solid var(--border2);border-radius:12px;color:var(--text);font-family:'Inter',sans-serif;font-size:0.85rem;outline:none;resize:none;min-height:44px;max-height:120px;line-height:1.5;transition:border-color 0.2s;}
+.chat-textarea:focus{border-color:var(--accent);}
+.chat-textarea::placeholder{color:var(--muted);}
+.send-btn{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;transition:all 0.2s;}
+.send-btn:hover:not(:disabled){transform:scale(1.05);box-shadow:0 4px 16px rgba(124,106,255,0.4);}
+.send-btn:disabled{opacity:0.35;cursor:not-allowed;transform:none;}
+.clear-btn{width:42px;height:42px;border-radius:12px;border:1px solid var(--border2);background:var(--card);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.85rem;flex-shrink:0;transition:all 0.2s;}
+.clear-btn:hover{border-color:var(--accent2);color:var(--accent2);}
+
+/* ===== TOAST ===== */
+.toast{position:fixed;bottom:24px;right:24px;padding:10px 18px;background:var(--card);border:1px solid var(--accent3);border-radius:10px;font-size:0.8rem;color:var(--accent3);font-weight:500;z-index:999;opacity:0;transform:translateY(10px);transition:all 0.3s;pointer-events:none;}
+.toast.show{opacity:1;transform:translateY(0);}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:900px){
+  .app{grid-template-columns:1fr;padding:0 16px 40px;}
+  .left{padding-right:0;}
+  .right{border-left:none;border-top:1px solid var(--border);padding-left:0;padding-top:28px;height:auto;position:static;margin-top:28px;}
+  .messages{height:360px;}
+}
+</style>
+</head>
+<body>
+<div class="blob b1"></div>
+<div class="blob b2"></div>
+<div class="blob b3"></div>
+
+<div class="app">
+  <!-- NAVBAR -->
+  <nav>
+    <div class="logo">Doc<span>Mind</span></div>
+    <div class="nav-right">
+      <div class="badge"><div class="pulse"></div>Claude AI</div>
+      <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
+    </div>
+  </nav>
+
+  <!-- LEFT: ANALYZER -->
+  <div class="left">
+    <div class="hero">
+      <h1>Understand any<br><span class="grad">PDF instantly.</span></h1>
+      <p class="sub">Drop a document. Get summaries, key insights, tone analysis — and chat with your PDF using AI.</p>
+    </div>
+
+    <!-- Upload -->
+    <div class="drop-area" id="dropArea">
+      <div class="dicon">📄</div>
+      <div class="dtitle">Drop your PDF here</div>
+      <div class="dsub">or <b>click to browse</b></div>
+    </div>
+    <input type="file" id="filePick" accept=".pdf" />
+
+    <div class="chip" id="chip">
+      <span>📎</span>
+      <div class="cname" id="cname">—</div>
+      <div class="csize" id="csize">—</div>
+      <div class="cdot"></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab on"  id="t-summary"   disabled onclick="setMode('summary')">  <span class="ti">📝</span>Summary</button>
+      <button class="tab"     id="t-keypoints" disabled onclick="setMode('keypoints')"><span class="ti">🔑</span>Key Points</button>
+      <button class="tab"     id="t-sentiment" disabled onclick="setMode('sentiment')"><span class="ti">🎭</span>Sentiment</button>
+    </div>
+
+    <button class="runbtn" id="runbtn" disabled onclick="runAnalysis()">✦ Analyze Document</button>
+
+    <!-- Results -->
+    <div id="results"></div>
+  </div>
+
+  <!-- RIGHT: AI CHAT -->
+  <div class="right">
+    <div class="chat-header">
+      <div class="chat-icon">🤖</div>
+      <div>
+        <div class="chat-title">AI Assistant</div>
+        <div class="chat-sub">Ask anything — about your PDF or anything else</div>
+      </div>
+    </div>
+
+    <div class="chat-context" id="chatContext">📄 PDF loaded — I can answer questions about your document</div>
+
+    <div class="messages" id="messages">
+      <div class="welcome">
+        <span class="wi">✨</span>
+        <b>Hello! I'm your AI assistant.</b><br>
+        Upload a PDF and ask me anything about it,<br>or just chat — I'm here to help with anything!
+      </div>
+    </div>
+
+    <div class="suggestions" id="suggestions">
+      <div class="sug" onclick="fillSug(this)">Summarize this PDF</div>
+      <div class="sug" onclick="fillSug(this)">What are the key points?</div>
+      <div class="sug" onclick="fillSug(this)">Explain it simply</div>
+      <div class="sug" onclick="fillSug(this)">What's the tone?</div>
+    </div>
+
+    <div class="chat-input-wrap">
+      <textarea class="chat-textarea" id="chatInput" placeholder="Ask me anything..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendChat()">➤</button>
+      <button class="clear-btn" title="Clear chat" onclick="clearChat()">🗑</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== STATE =====
+let pdfB64 = null;
+let mode = 'summary';
+let busy = false;
+let chatBusy = false;
+let chatHistory = [];
+
+// ===== THEME =====
+const themeBtn = document.getElementById('themeBtn');
+let theme = localStorage.getItem('theme') || 'dark';
+applyTheme(theme);
+
+function applyTheme(t) {
+  theme = t;
+  document.documentElement.setAttribute('data-theme', t);
+  themeBtn.textContent = t === 'dark' ? '☀️' : '🌙';
+  localStorage.setItem('theme', t);
+}
+themeBtn.onclick = () => applyTheme(theme === 'dark' ? 'light' : 'dark');
+
+// ===== DRAG & DROP =====
+const dropArea = document.getElementById('dropArea');
+const filePick = document.getElementById('filePick');
+
+dropArea.addEventListener('click', () => filePick.click());
+filePick.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+['dragenter','dragover'].forEach(ev => dropArea.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); dropArea.classList.add('over'); }));
+['dragleave','dragend'].forEach(ev => dropArea.addEventListener(ev, e => { e.preventDefault(); dropArea.classList.remove('over'); }));
+dropArea.addEventListener('drop', e => {
+  e.preventDefault(); e.stopPropagation(); dropArea.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type === 'application/pdf') loadFile(f);
+  else showToast('⚠ Please drop a PDF file');
+});
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    pdfB64 = e.target.result.split(',')[1];
+    document.getElementById('cname').textContent = file.name;
+    document.getElementById('csize').textContent = (file.size / 1024).toFixed(1) + ' KB';
+    document.getElementById('chip').classList.add('on');
+    dropArea.classList.add('ok');
+    dropArea.style.padding = '20px';
+    ['summary','keypoints','sentiment'].forEach(m => document.getElementById('t-'+m).disabled = false);
+    document.getElementById('runbtn').disabled = false;
+    document.getElementById('chatContext').classList.add('on');
+    showToast('✓ PDF loaded successfully!');
+  };
+  reader.readAsDataURL(file);
+}
+
+// ===== TABS =====
+function setMode(m) {
+  mode = m;
+  ['summary','keypoints','sentiment'].forEach(id => document.getElementById('t-'+id).classList.toggle('on', id===m));
+}
+
+// ===== ANALYSIS =====
+const cfgs = {
+  summary:   { title:'Document Summary', icon:'📝', ic:'is', tc:'tgs', tag:'Summary',
+    prompt:'Provide a clear, engaging summary of this PDF in 3–4 paragraphs. Cover its main purpose, key arguments, and conclusions.' },
+  keypoints: { title:'Key Takeaways',     icon:'🔑', ic:'ik', tc:'tgk', tag:'Key Points',
+    prompt:'Extract the 5–7 most important key points from this document. Format each as:\n→ [Title]: [1–2 sentence explanation]' },
+  sentiment: { title:'Sentiment & Tone',  icon:'🎭', ic:'it', tc:'tgt', tag:'Sentiment',
+    prompt:'Analyze this document\'s tone and sentiment using this format:\n\nOVERALL SENTIMENT: [Positive/Negative/Neutral/Mixed] — reason\nTONE: [describe]\nFORMALITY: [1–10] — brief reason\nEMOTIONAL INTENSITY: [Low/Medium/High] — reason\nKEY OBSERVATIONS:\n• ...\n• ...\n• ...\nAUTHOR INTENT: [1–2 sentences]' },
+};
+
+async function runAnalysis() {
+  if (!pdfB64 || busy) return;
+  busy = true;
+  const rb = document.getElementById('runbtn');
+  rb.disabled = true; rb.textContent = 'Analyzing...';
+
+  const cfg = cfgs[mode];
+  const cid = 'c' + Date.now();
+  const area = document.getElementById('results');
+
+  if (!area.querySelector('.rlabel')) {
+    const l = document.createElement('div'); l.className = 'rlabel'; l.textContent = 'Results'; area.prepend(l);
+  }
+
+  const card = document.createElement('div');
+  card.className = 'rcard'; card.id = cid;
+  card.innerHTML = `
+    <div class="rhead">
+      <div class="rico ${cfg.ic}">${cfg.icon}</div>
+      <div class="rtitle">${cfg.title}</div>
+      <span class="rtag ${cfg.tc}">${cfg.tag}</span>
+      <button class="copy-btn" id="copy-${cid}" onclick="copyResult('${cid}')" title="Copy">📋</button>
+    </div>
+    <div class="rbody loading" id="${cid}b">
+      <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+      Claude is reading your document...
+    </div>`;
+
+  const first = area.querySelector('.rcard');
+  first ? area.insertBefore(card, first) : area.appendChild(card);
+
+  try {
+    const res = await fetch('/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pdf: pdfB64, prompt: cfg.prompt })
+    });
+    const data = await res.json();
+    const el = document.getElementById(cid + 'b');
+    el.className = 'rbody';
+    if (data.error) { el.style.color = '#ff8080'; el.textContent = '⚠ ' + data.error; }
+    else { el.textContent = data.result; showToast('✓ Analysis complete!'); }
+  } catch (err) {
+    const el = document.getElementById(cid + 'b');
+    el.className = 'rbody'; el.style.color = '#ff8080';
+    el.textContent = '⚠ Request failed: ' + err.message;
+  }
+  busy = false;
+  rb.disabled = false; rb.textContent = '✦ Analyze Document';
+}
+
+// ===== COPY RESULT =====
+function copyResult(cid) {
+  const text = document.getElementById(cid + 'b')?.textContent;
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-' + cid);
+    btn.textContent = '✓'; btn.classList.add('copied');
+    showToast('✓ Copied to clipboard!');
+    setTimeout(() => { btn.textContent = '📋'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+// ===== CHAT =====
+function fillSug(el) {
+  document.getElementById('chatInput').value = el.textContent;
+  document.getElementById('chatInput').focus();
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function clearChat() {
+  chatHistory = [];
+  const m = document.getElementById('messages');
+  m.innerHTML = `<div class="welcome"><span class="wi">✨</span><b>Chat cleared!</b><br>Start a new conversation below.</div>`;
+}
+
+function appendMsg(role, text) {
+  const m = document.getElementById('messages');
+  const welcome = m.querySelector('.welcome');
+  if (welcome) welcome.remove();
+
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  div.textContent = text;
+
+  if (role === 'ai') {
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'msg-copy'; copyBtn.textContent = '📋'; copyBtn.title = 'Copy';
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(text).then(() => {
+        copyBtn.textContent = '✓'; copyBtn.classList.add('copied');
+        showToast('✓ Copied!');
+        setTimeout(() => { copyBtn.textContent = '📋'; copyBtn.classList.remove('copied'); }, 2000);
+      });
+    };
+    div.appendChild(copyBtn);
+  }
+
+  m.appendChild(div);
+  m.scrollTop = m.scrollHeight;
+  return div;
+}
+
+function appendTyping() {
+  const m = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg ai typing'; div.id = 'typing';
+  div.innerHTML = '<div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+  m.appendChild(div); m.scrollTop = m.scrollHeight;
+}
+
+function removeTyping() {
+  const t = document.getElementById('typing');
+  if (t) t.remove();
+}
+
+async function sendChat() {
+  const inp = document.getElementById('chatInput');
+  const text = inp.value.trim();
+  if (!text || chatBusy) return;
+
+  chatBusy = true;
+  inp.value = ''; inp.style.height = 'auto';
+  document.getElementById('sendBtn').disabled = true;
+
+  appendMsg('user', text);
+  chatHistory.push({ role: 'user', content: text });
+  appendTyping();
+
+  // Build messages: first message includes PDF if available, subsequent ones don't
+  const messagesForAPI = chatHistory.map((m, i) => {
+    if (i === 0 && pdfB64) {
+      return { role: 'user', content: [
+        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfB64 } },
+        { type: 'text', text: m.content }
+      ]};
+    }
+    return m;
+  });
+
+  try {
+    const res = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: messagesForAPI, pdf: null })
+    });
+    const data = await res.json();
+    removeTyping();
+    const reply = data.error ? '⚠ ' + data.error : data.result;
+    appendMsg('ai', reply);
+    chatHistory.push({ role: 'assistant', content: reply });
+  } catch (err) {
+    removeTyping();
+    appendMsg('ai', '⚠ Request failed: ' + err.message);
+  }
+
+  chatBusy = false;
+  document.getElementById('sendBtn').disabled = false;
+}
+
+// ===== TOAST =====
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
